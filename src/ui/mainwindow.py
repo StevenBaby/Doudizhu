@@ -24,6 +24,10 @@ class Ui_MainWindow(object):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(1223, 861)
+        font = QFont()
+        font.setFamilies([u"DengXian"])
+        font.setPointSize(20)
+        MainWindow.setFont(font)
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.horizontalLayout = QHBoxLayout(self.centralwidget)
@@ -31,6 +35,10 @@ class Ui_MainWindow(object):
         self.card_frame = QFrame(self.centralwidget)
         self.card_frame.setObjectName(u"card_frame")
         self.card_frame.setMinimumSize(QSize(600, 800))
+        font1 = QFont()
+        font1.setFamilies([u"DengXian"])
+        font1.setPointSize(16)
+        self.card_frame.setFont(font1)
         self.card_frame.setFrameShape(QFrame.StyledPanel)
         self.card_frame.setFrameShadow(QFrame.Sunken)
 
@@ -46,13 +54,21 @@ class Ui_MainWindow(object):
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.startButton = QPushButton(self.frame_2)
         self.startButton.setObjectName(u"startButton")
+        self.startButton.setMinimumSize(QSize(0, 80))
 
         self.verticalLayout.addWidget(self.startButton)
 
         self.showButton = QPushButton(self.frame_2)
         self.showButton.setObjectName(u"showButton")
+        self.showButton.setMinimumSize(QSize(100, 80))
 
         self.verticalLayout.addWidget(self.showButton)
+
+        self.hintButton = QPushButton(self.frame_2)
+        self.hintButton.setObjectName(u"hintButton")
+        self.hintButton.setMinimumSize(QSize(0, 80))
+
+        self.verticalLayout.addWidget(self.hintButton)
 
 
         self.horizontalLayout.addWidget(self.frame_2)
@@ -60,7 +76,7 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 1223, 22))
+        self.menubar.setGeometry(QRect(0, 0, 1223, 35))
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QStatusBar(MainWindow)
         self.statusbar.setObjectName(u"statusbar")
@@ -75,5 +91,6 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
         self.startButton.setText(QCoreApplication.translate("MainWindow", u"\u5f00\u59cb\u6e38\u620f", None))
         self.showButton.setText(QCoreApplication.translate("MainWindow", u"\u51fa\u724c", None))
+        self.hintButton.setText(QCoreApplication.translate("MainWindow", u"\u63d0\u793a", None))
     # retranslateUi
 
