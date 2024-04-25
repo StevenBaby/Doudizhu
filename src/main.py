@@ -1,171 +1,217 @@
 import os
-import numpy as np
+import sys
+import glob
+import random
 
-from colorama import (
-    init as colorama_init,
-    Fore,
-    Style,
-    Back,
+from PySide6 import (
+    QtGui, QtCore, QtWidgets
 )
 
-from douzero.env.game import GameEnv
-from douzero.env.game import InfoSet
-from douzero.env.game import bombs
-from douzero.evaluation.deep_agent import DeepAgent
-from douzero.evaluation import simulation as sim
-
+import cairosvg
 from logger import logger
+
+import ui
+
+dirname = os.path.dirname(os.path.abspath(__file__))
 
 dirname = os.path.dirname(os.path.abspath(__file__))
 
 
-models = {
-    'landlord': os.path.join(dirname, "baselines/douzero_WP/landlord.ckpt"),
-    'landlord_up': os.path.join(dirname, "baselines/douzero_WP/landlord_up.ckpt"),
-    'landlord_down': os.path.join(dirname, "baselines/douzero_WP/landlord_down.ckpt")
+Name2Real = {
+    '1D': 'D', '1X': 'X',
+    '2C': '2', '2D': '2', '2H': '2', '2S': '2',
+    '3C': '3', '3D': '3', '3H': '3', '3S': '3',
+    '4C': '4', '4D': '4', '4H': '4', '4S': '4',
+    '5C': '5', '5D': '5', '5H': '5', '5S': '5',
+    '6C': '6', '6D': '6', '6H': '6', '6S': '6',
+    '7C': '7', '7D': '7', '7H': '7', '7S': '7',
+    '8C': '8', '8D': '8', '8H': '8', '8S': '8',
+    '9C': '9', '9D': '9', '9H': '9', '9S': '9',
+    'TC': 'T', 'TD': 'T', 'TH': 'T', 'TS': 'T',
+    'JC': 'J', 'JD': 'J', 'JH': 'J', 'JS': 'J',
+    'QC': 'Q', 'QD': 'Q', 'QH': 'Q', 'QS': 'Q',
+    'KC': 'K', 'KD': 'K', 'KH': 'K', 'KS': 'K',
+    'AC': 'A', 'AD': 'A', 'AH': 'A', 'AS': 'A',
 }
 
-EnvCard2RealCard = {3: '3', 4: '4', 5: '5', 6: '6', 7: '7',
-                    8: '8', 9: '9', 10: 'T', 11: 'J', 12: 'Q',
-                    13: 'K', 14: 'A', 17: '2', 20: 'X', 30: 'D'}
+Env2Real = {
+    3: '3', 4: '4', 5: '5', 6: '6', 7: '7',
+    8: '8', 9: '9', 10: 'T', 11: 'J', 12: 'Q',
+    13: 'K', 14: 'A', 17: '2', 20: 'X', 30: 'D'}
 
-RealCard2EnvCard = {'3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
-                    '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12,
-                    'K': 13, 'A': 14, '2': 17, 'X': 20, 'D': 30}
-
-AllEnvCard = [i for i in range(3, 15) for _ in range(4)]
-AllEnvCard.extend([17 for _ in range(4)])
-AllEnvCard.extend([20, 30])
-
-
-def render_action(action):
-    cards = [EnvCard2RealCard[a] for a in action]
-    return "".join(cards)
+Real2Env = {
+    '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
+    '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12,
+    'K': 13, 'A': 14, '2': 17, 'X': 20, 'D': 30
+}
 
 
-def paste_action(string):
-    action = []
-    if string in {'n', 'pass'}:
-        return action
-    for ch in string:
-        if ch not in RealCard2EnvCard:
-            return None
-        action.append(RealCard2EnvCard[ch])
-    return action
+class Card(QtWidgets.QLabel):
+
+    def __init__(self, filename, parent=None):
+        super().__init__(parent=parent)
+        self.filename = filename
+        basename = os.path.basename(filename)
+        name, ext = os.path.splitext(basename)
+        self.name = name
+        assert (name in Name2Real)
+        self.real = Name2Real[name]
+        self.env = Real2Env[self.real]
+
+        with open(filename, 'rb') as file:
+            data = cairosvg.svg2png(file_obj=file)
+            image = QtGui.QImage()
+            image.loadFromData(data)
+            pixmap = QtGui.QPixmap.fromImage(image)
+            self.setPixmap(pixmap)
+        self.setGeometry(0, 0, 160, 224)
+        self.setScaledContents(True)
+
+        self.base_geometry = self.geometry()
+        self.actived = False  # 表示已选中
+
+    def setActived(self, actived):
+        rect = self.base_geometry
+        if not self.actived:
+            self.setGeometry(rect.x(), rect.y() - 20, rect.width(), rect.height())
+        else:
+            self.setGeometry(self.base_geometry)
+        self.actived = actived
+
+    def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
+        self.setActived(not self.actived)
+        return super().mousePressEvent(ev)
 
 
-def generate_data():
-    deck = AllEnvCard.copy()
-    np.random.shuffle(deck)
-    card_play_data = {'landlord': deck[:20],
-                      'landlord_up': deck[20:37],
-                      'landlord_down': deck[37:54],
-                      'three_landlord_cards': deck[17:20],
-                      }
-    for key in card_play_data:
-        card_play_data[key].sort()
-    return card_play_data
+class CardList(QtWidgets.QWidget):
+
+    def __init__(self, parent: QtWidgets.QWidget) -> None:
+        super().__init__(parent)
+        # self.raise_()
+        # self.setStyleSheet("background-color: red;")
+        self.setStyleSheet("background-color: transparent;")
+
+        self.all_cards = {}
+        for name in Name2Real:
+            cardname = os.path.join(dirname, f'images/{name}.svg')
+            card = Card(cardname, self)
+            self.all_cards[name] = card
+            card.setVisible(False)
+            rect = card.geometry()
+            card.setGeometry(rect.x(), 20, rect.width(), rect.height())
+
+        self.cards = []
+
+    def add_card(self, name):
+        if name in self.cards:
+            return
+        assert (name in Name2Real)
+        self.cards.append(name)
+        self.update_cards()
+
+    def remove_card(self, name):
+        self.all_cards[name].actived = False
+        self.cards.remove(name)
+        self.update_cards()
+
+    def update_cards(self):
+        for card in self.all_cards.values():
+            card.setVisible(False)
+
+        self.cards = sorted(self.cards, key=lambda e: Real2Env[Name2Real[e]])
+
+        x = 0
+        for name in self.cards:
+            card = self.all_cards[name]
+            card.setVisible(True)
+            card.raise_()
+            rect = card.geometry()
+            card.setGeometry(x, rect.y(), rect.width(), rect.height())
+            card.base_geometry = card.geometry()
+            x += 30
+
+    def clearlist(self):
+        self.cards = []
+        for card in self.all_cards.values():
+            card.setVisible(False)
+
+    def get_actived_cards(self):
+        cards = []
+        for card in self.all_cards.values():
+            if card.actived:
+                cards.append(card.name)
+        return cards
 
 
-class MyEnv(GameEnv):
+class MainWindow(QtWidgets.QMainWindow):
 
-    def step(self, action=None):
-        if action is None:
-            action = self.players[self.acting_player_position].act(
-                self.game_infoset)
+    def __init__(self) -> None:
+        super().__init__()
+        self.ui = ui.mainwindow.Ui_MainWindow()
+        self.ui.setupUi(self)
 
-        if len(action) > 0:
-            self.last_pid = self.acting_player_position
+        self.setWindowTitle("斗地主")
+        # self.setStyleSheet("background-color: red;")
 
-        if action in bombs:
-            self.bomb_num += 1
+        self.ui.startButton.clicked.connect(self.start_game)
+        self.ui.showButton.clicked.connect(self.show_cards)
 
-        self.last_move_dict[
-            self.acting_player_position] = action.copy()
+        self.cardlists = [
+            CardList(self.ui.card_frame),
+            CardList(self.ui.card_frame),
+            CardList(self.ui.card_frame),
+            CardList(self.ui.card_frame),
+        ]
 
-        self.card_play_action_seq.append(action)
-        self.update_acting_player_hand_cards(action)
+        self.start_game()
 
-        self.played_cards[self.acting_player_position] += action
+    def start_game(self):
+        logger.debug("start game")
+        names = list(Name2Real.keys())
+        random.shuffle(names)
 
-        if self.acting_player_position == 'landlord' and \
-                len(action) > 0 and \
-                len(self.three_landlord_cards) > 0:
-            for card in action:
-                if len(self.three_landlord_cards) > 0:
-                    if card in self.three_landlord_cards:
-                        self.three_landlord_cards.remove(card)
-                else:
-                    break
+        y = 0
+        for idx, namelist in enumerate([
+            names[:17],
+            names[17: 34],
+            names[34:],
+            [],
+        ]):
+            self.cardlists[idx].clearlist()
+            for name in namelist:
+                self.cardlists[idx].add_card(name)
+            rect = self.cardlists[idx].geometry()
+            self.cardlists[idx].setGeometry(rect.x(), y, 1000, 300)
+            y += 240
 
-        self.game_done()
-        if not self.game_over:
-            self.get_acting_player_position()
-            self.game_infoset = self.get_infoset()
+        self.activeindex = 2
+        self.activelist = self.cardlists[2]
+        self.activelist.setStyleSheet("background-color: green;")
+        self.showlist = self.cardlists[3]
 
-        return action
+    def show_cards(self):
+        logger.debug("show cards")
 
+        cards = self.activelist.get_actived_cards()
+        logger.debug(cards)
+        if cards:
+            self.showlist.clearlist()
+        for name in cards:
+            self.activelist.remove_card(name)
+            self.showlist.add_card(name)
 
-def input_action(info_sets):
-    if len(info_sets['landlord'].legal_actions) == 1:
-        return info_sets['landlord'].legal_actions[0]
-    while True:
-        info = f"{Fore.GREEN}{len(info_sets['landlord_up'].player_hand_cards)} " \
-        f"{Fore.RED}{render_action(info_sets['landlord'].player_hand_cards)} " \
-        f"{Fore.MAGENTA}{len(info_sets['landlord_down'].player_hand_cards)} {Style.RESET_ALL}"
-        print(info)
-        action = paste_action(input("INPUT: "))
-        if action is None:
-            continue
-        if not action:
-            return action
-        for a in info_sets['landlord'].legal_actions:
-            if tuple(a) == tuple(action):
-                return action
-        continue
-
-
-def play():
-    # 输入玩家的牌
-    data = generate_data()
-
-    logger.info("loading models....")
-    players = sim.load_card_play_models(models)
-
-    env = MyEnv(players)
-    env.card_play_init(data)
-    idx = 1
-
-    colors = [Fore.GREEN, Fore.RED, Fore.MAGENTA]
-
-    while not env.game_over:
-        action = None
-        if idx % 3 == 1:
-            action = input_action(env.info_sets)
-
-        action = env.step(action)
-        action = render_action(action)
-        if not action:
-            action = 'pass'
-        print(f"{colors[idx % 3]}{action}")
-        idx += 1
-
-    info = f"{Fore.GREEN}{render_action(env.info_sets['landlord_up'].player_hand_cards)} " \
-        f"{Fore.RED}{render_action(env.info_sets['landlord'].player_hand_cards)} " \
-        f"{Fore.MAGENTA}{render_action(env.info_sets['landlord_down'].player_hand_cards)} {Style.RESET_ALL}"
-    print(info)
-
-    env.reset()
-
-    print(env.num_wins['landlord'],
-          env.num_wins['farmer'],
-          env.num_scores['landlord'],
-          env.num_scores['farmer'])
+        self.activelist.setStyleSheet("background-color: transparent;")
+        self.activeindex = (self.activeindex + 1) % 3
+        self.activelist = self.cardlists[self.activeindex]
+        self.activelist.setStyleSheet("background-color: green;")
 
 
 def main():
-    colorama_init()
-    play()
+    app = QtWidgets.QApplication(sys.argv)
+
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
 
 
 if __name__ == '__main__':
