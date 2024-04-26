@@ -14,48 +14,14 @@ from douzero.evaluation.deep_agent import DeepAgent
 from douzero.evaluation import simulation as sim
 
 from logger import logger
+import doudizhu
+
+from doudizhu import models, Name2Real, Real2Env, Env2Real
 
 import ui
 
 dirname = os.path.dirname(os.path.abspath(__file__))
 
-models = {
-    'landlord': os.path.join(dirname, "baselines/douzero_WP/landlord.ckpt"),
-    'landlord_up': os.path.join(dirname, "baselines/douzero_WP/landlord_up.ckpt"),
-    'landlord_down': os.path.join(dirname, "baselines/douzero_WP/landlord_down.ckpt")
-}
-
-Name2Real = {
-    '1D': 'D', '1X': 'X',
-    '2C': '2', '2D': '2', '2H': '2', '2S': '2',
-    '3C': '3', '3D': '3', '3H': '3', '3S': '3',
-    '4C': '4', '4D': '4', '4H': '4', '4S': '4',
-    '5C': '5', '5D': '5', '5H': '5', '5S': '5',
-    '6C': '6', '6D': '6', '6H': '6', '6S': '6',
-    '7C': '7', '7D': '7', '7H': '7', '7S': '7',
-    '8C': '8', '8D': '8', '8H': '8', '8S': '8',
-    '9C': '9', '9D': '9', '9H': '9', '9S': '9',
-    'TC': 'T', 'TD': 'T', 'TH': 'T', 'TS': 'T',
-    'JC': 'J', 'JD': 'J', 'JH': 'J', 'JS': 'J',
-    'QC': 'Q', 'QD': 'Q', 'QH': 'Q', 'QS': 'Q',
-    'KC': 'K', 'KD': 'K', 'KH': 'K', 'KS': 'K',
-    'AC': 'A', 'AD': 'A', 'AH': 'A', 'AS': 'A',
-}
-
-Env2Real = {
-    3: '3', 4: '4', 5: '5', 6: '6', 7: '7',
-    8: '8', 9: '9', 10: 'T', 11: 'J', 12: 'Q',
-    13: 'K', 14: 'A', 17: '2', 20: 'X', 30: 'D'}
-
-Real2Env = {
-    '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
-    '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12,
-    'K': 13, 'A': 14, '2': 17, 'X': 20, 'D': 30
-}
-
-AllEnvCard = [i for i in range(3, 15) for _ in range(4)]
-AllEnvCard.extend([17 for _ in range(4)])
-AllEnvCard.extend([20, 30])
 
 player_names = [
     'landlord',
@@ -202,48 +168,6 @@ class CardList(QtWidgets.QWidget):
         return cards
 
 
-class DouDiZhuEnv(GameEnv):
-
-    def hint(self):
-        return self.players[self.acting_player_position].act(self.game_infoset)
-
-    def step(self, action=None):
-        if action is None:
-            action = self.players[self.acting_player_position].act(
-                self.game_infoset)
-
-        if len(action) > 0:
-            self.last_pid = self.acting_player_position
-
-        if action in bombs:
-            self.bomb_num += 1
-
-        self.last_move_dict[
-            self.acting_player_position] = action.copy()
-
-        self.card_play_action_seq.append(action)
-        self.update_acting_player_hand_cards(action)
-
-        self.played_cards[self.acting_player_position] += action
-
-        if self.acting_player_position == 'landlord' and \
-                len(action) > 0 and \
-                len(self.three_landlord_cards) > 0:
-            for card in action:
-                if len(self.three_landlord_cards) > 0:
-                    if card in self.three_landlord_cards:
-                        self.three_landlord_cards.remove(card)
-                else:
-                    break
-
-        self.game_done()
-        if not self.game_over:
-            self.get_acting_player_position()
-            self.game_infoset = self.get_infoset()
-
-        return action
-
-
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self) -> None:
@@ -271,7 +195,10 @@ class MainWindow(QtWidgets.QMainWindow):
         ]
 
         logger.info("loading models....")
-        self.players = sim.load_card_play_models(models)
+
+        self.players = {}
+        for name in player_names:
+            self.players[name] = doudizhu.DouDizhuAgent(name, models[name])
 
         self.timer = QtCore.QTimer(self)
         # 连接 timeout 信号到自定义的槽函数
@@ -303,7 +230,11 @@ class MainWindow(QtWidgets.QMainWindow):
                           'three_landlord_cards': deck[17:20],
                           }
 
-        self.env = DouDiZhuEnv(self.players)
+        self.envs = {}
+        for name in player_names:
+            ...
+
+        self.env = doudizhu.DouDiZhuEnv(self.players)
         self.env.card_play_init(card_play_data)
 
         y = 10
@@ -327,12 +258,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.activelist.setStyleSheet("background-color: green;")
 
     def hint(self):
-        action = self.env.hint()
+        action, confidence = self.env.hint()
         logger.debug("hint %s", action)
         actionname = ",".join([Env2Real[var] for var in action])
         if not action:
             actionname = '要不起'
-        self.ui.statusbar.showMessage(f"提示{player_zh_names[self.activeindex]}出牌 {actionname}")
+        self.ui.statusbar.showMessage(f"提示{player_zh_names[self.activeindex]}出牌 {actionname} 胜率 {confidence:0.2f}")
 
         for name in self.activelist.cards:
             card = self.activelist.all_cards[name]
@@ -367,8 +298,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if not action:
             actionname = '要不起'
 
-        self.ui.statusbar.showMessage(f"{player_zh_names[self.activeindex]}出牌 {actionname}")
-        self.env.step(action)
+        action, confidence = self.env.step(action)
+        self.ui.statusbar.showMessage(f"{player_zh_names[self.activeindex]}出牌 {actionname} 胜率 {confidence:0.2f}")
 
         self.showlists[self.activeindex].clearlist()
         for name in cards:

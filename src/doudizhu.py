@@ -1,5 +1,16 @@
 import os
 
+import torch
+import numpy as np
+
+from douzero.evaluation.deep_agent import DeepAgent
+from douzero.env.env import get_obs
+from douzero.env.game import GameEnv
+from douzero.env.game import InfoSet
+from douzero.env.game import bombs
+from douzero.evaluation.deep_agent import DeepAgent
+from douzero.evaluation import simulation as sim
+
 dirname = os.path.dirname(os.path.abspath(__file__))
 
 Name2Real = {
@@ -35,3 +46,86 @@ models = {
     'landlord_up': os.path.join(dirname, "baselines/douzero_WP/landlord_up.ckpt"),
     'landlord_down': os.path.join(dirname, "baselines/douzero_WP/landlord_down.ckpt")
 }
+
+
+class DouDizhuAgent(DeepAgent):
+
+    def predict(self, infoset):
+        obs = get_obs(infoset)
+
+        z_batch = torch.from_numpy(obs['z_batch']).float()
+        x_batch = torch.from_numpy(obs['x_batch']).float()
+        if torch.cuda.is_available():
+            z_batch, x_batch = z_batch.cuda(), x_batch.cuda()
+        y_pred = self.model.forward(z_batch, x_batch, return_value=True)['values']
+        y_pred = y_pred.detach().cpu().numpy()
+        return y_pred
+
+    def act(self, infoset):
+        y_pred = self.predict(infoset)
+
+        best_action_index = np.argmax(y_pred, axis=0)[0]
+        best_action = infoset.legal_actions[best_action_index]
+        best_confidence = y_pred[best_action_index][0]
+        best_confidence = max(best_confidence, -1.0)
+        best_confidence = min(best_confidence, 1.0)
+
+        return best_action, best_confidence
+
+    def confident(self, infoset, action):
+        y_pred = self.predict(infoset)
+
+        for idx, act in enumerate(infoset.legal_actions):
+            if tuple(act) == tuple(action):
+                break
+
+        confidence = y_pred[idx][0]
+        confidence = max(confidence, -1.0)
+        confidence = min(confidence, 1.0)
+
+        return confidence
+
+
+class DouDiZhuEnv(GameEnv):
+
+    def hint(self):
+        return self.players[self.acting_player_position].act(self.game_infoset)
+
+    def step(self, action=None):
+        if action is None:
+            action, confidence = self.players[self.acting_player_position].act(
+                self.game_infoset)
+        else:
+            confidence = self.players[self.acting_player_position].confident(
+                self.game_infoset, action)
+
+        if len(action) > 0:
+            self.last_pid = self.acting_player_position
+
+        if action in bombs:
+            self.bomb_num += 1
+
+        self.last_move_dict[
+            self.acting_player_position] = action.copy()
+
+        self.card_play_action_seq.append(action)
+        self.update_acting_player_hand_cards(action)
+
+        self.played_cards[self.acting_player_position] += action
+
+        if self.acting_player_position == 'landlord' and \
+                len(action) > 0 and \
+                len(self.three_landlord_cards) > 0:
+            for card in action:
+                if len(self.three_landlord_cards) > 0:
+                    if card in self.three_landlord_cards:
+                        self.three_landlord_cards.remove(card)
+                else:
+                    break
+
+        self.game_done()
+        if not self.game_over:
+            self.get_acting_player_position()
+            self.game_infoset = self.get_infoset()
+
+        return action, confidence
