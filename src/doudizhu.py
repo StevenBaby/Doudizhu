@@ -1,4 +1,5 @@
 import os
+import random
 
 import numpy as np
 import torch
@@ -43,6 +44,15 @@ Env2Real = {
     10: 'T', 9: '9', 8: '8', 7: '7',
     6: '6', 5: '5', 4: '4', 3: '3'}
 
+Suit = {
+    'D': 6,
+    'X': 5,
+    'S': 4,
+    'H': 3,
+    'C': 2,
+    'D': 1,
+}
+
 
 models = {
     'landlord': os.path.join(dirname, "baselines/douzero_WP/landlord.ckpt"),
@@ -51,4 +61,50 @@ models = {
 }
 
 
+class Doudizhu(object):
 
+    def __init__(self) -> None:
+        data = list(Name2Real.keys())
+        random.shuffle(data)
+
+        self.own_cards = data[:17]
+        self.down_cards = data[17:34]
+        self.up_cards = data[34:-3]
+        self.three_cards = data[-3:]
+
+        self.own_cards += self.three_cards
+        self.index = 0
+
+        self.cards = [
+            self.own_cards,
+            self.down_cards,
+            self.up_cards,
+        ]
+
+        self.marks = [
+            {},
+            {},
+            {},
+        ]
+
+    def action(self, cards: list[str]):
+        for name in cards:
+            self.cards[self.index].remove(name)
+            self.marks[self.index].setdefault(Name2Real[name], 0)
+            self.marks[self.index][Name2Real[name]] += 1
+
+    def next(self):
+        self.index = (self.index + 1) % 3
+
+    def remain_cards(self):
+        cards = {}
+        for name in list(Name2Real.keys()):
+            cards.setdefault(Name2Real[name], 0)
+            cards[Name2Real[name]] += 1
+
+        for i in range(3):
+            mark = self.marks[i]
+            for name, cnt in mark.items():
+                cards[name] -= cnt
+
+        return cards

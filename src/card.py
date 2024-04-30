@@ -6,7 +6,7 @@ import random
 import cairosvg
 
 from PySide6 import QtCore, QtWidgets, QtGui
-from doudizhu import Name2Real, Real2Env, Env2Real
+from doudizhu import Name2Real, Real2Env, Env2Real, Suit
 
 from logger import logger
 import ui
@@ -22,15 +22,34 @@ def read_svg_pixmap(filename):
         return QtGui.QPixmap.fromImage(image)
 
 
+def read_svg_image(filename):
+    with open(filename) as file:
+        data = cairosvg.svg2png(file_obj=file, scale=1)
+        image = QtGui.QImage()
+        image.loadFromData(data)
+        return image
+
+
 def svg_filename(name):
     return os.path.join(dirname, f"images/cards/{name}.svg")
+
+
+def read_card_pixmap():
+    result = {}
+    result['0B'] = read_svg_image(svg_filename('0B'))
+    for name in Name2Real:
+        result[name] = read_svg_image(svg_filename(name))
+    return result
+
+
+CARD_PIXMAP = read_card_pixmap()
 
 
 class Card(QtWidgets.QLabel):
 
     clicked = QtCore.Signal(object)
 
-    def __init__(self, name, parent=None, back=False, width=100):
+    def __init__(self, name, parent=None, back=False, width=100, height=155):
         super().__init__(parent=parent)
         assert (name in Name2Real)
 
@@ -40,15 +59,15 @@ class Card(QtWidgets.QLabel):
         self.back = back  # 显示背面
         self.selected = False  # 表示已选中
 
-        self.front_pixmap = read_svg_pixmap(svg_filename(name))
-        self.back_pixmap = read_svg_pixmap(os.path.join(dirname, f"images/cards/0B.svg"))
+        self.front_pixmap = QtGui.QPixmap.fromImage(CARD_PIXMAP[name])
+        self.back_pixmap = QtGui.QPixmap.fromImage(CARD_PIXMAP['0B'])
         if back:
             self.setPixmap(self.back_pixmap)
         else:
             self.setPixmap(self.front_pixmap)
         # 216 / 336
 
-        height = int(width * 336 / 216)
+        # height = int(width * 336 / 216)
         self.setGeometry(0, 0, width, height)
         self.setScaledContents(True)
 
@@ -64,17 +83,18 @@ class Card(QtWidgets.QLabel):
         return False
 
 
-class CardList(QtWidgets.QFrame):
+class CardList(QtWidgets.QWidget):
 
     SELECT_OFFSET = 20
     LIST_OFFSET = 25
     CARD_WIDTH = 100
+    CARD_HEIGHT = int(CARD_WIDTH * 336 / 216)
 
     def __init__(self, parent: QtWidgets.QWidget) -> None:
         super().__init__(parent)
 
-        self.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.setFrameShadow(QtWidgets.QFrame.Sunken)
+        # self.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        # self.setFrameShadow(QtWidgets.QFrame.Sunken)
 
         self.back = False
         self.all_cards = {}
@@ -88,8 +108,17 @@ class CardList(QtWidgets.QFrame):
             card.setVisible(False)
             self.all_cards[name] = card
 
-    def update(self):
-        # self.cards = sorted(self.cards, key=lambda e: Real2Env[Name2Real[e]])
+        self.setMaximumHeight(self.CARD_HEIGHT + self.SELECT_OFFSET)
+
+        self.label = QtWidgets.QLabel(self)
+        self.label.setText('0')
+
+    def update(self, sort=True):
+        if sort:
+            self.cards = sorted(
+                self.cards,
+                key=lambda e: (Real2Env[Name2Real[e]], Suit[e[1]]),
+                reverse=True)
 
         for card in self.all_cards.values():
             card.setVisible(False)
@@ -104,6 +133,9 @@ class CardList(QtWidgets.QFrame):
                 rect.height())
             card.setVisible(True)
             card.raise_()
+
+        self.label.setText(str(len(self.cards)))
+        self.label.raise_()
 
         super().update()
 
@@ -133,7 +165,7 @@ class CardList(QtWidgets.QFrame):
         cards = []
         for card in self.all_cards.values():
             if card.selected:
-                cards.append(card.env)
+                cards.append(card.name)
         return cards
 
     def getRealSelectedCards(self):
@@ -173,6 +205,8 @@ class CardMarker(QtWidgets.QTableWidget):
         self.verticalHeader().hide()
         self.setMinimumWidth(31 * len(self.CARD_TYPES))
         self.setMinimumHeight(27 * 2)
+        self.setMaximumWidth(31 * len(self.CARD_TYPES))
+        self.setMaximumHeight(27 * 2)
 
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
@@ -201,7 +235,11 @@ class CardMarker(QtWidgets.QTableWidget):
 
     def updateCard(self):
         for idx, name in enumerate(self.CARD_TYPES.values()):
-            self.item(1, idx).setText(str(self.cards[name]))
+            if name in self.cards:
+                text = str(self.cards[name])
+            else:
+                text = '0'
+            self.item(1, idx).setText(text)
 
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         w = self.width() // len(self.CARD_TYPES)
