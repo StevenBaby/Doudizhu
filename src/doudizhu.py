@@ -1,3 +1,17 @@
+import os
+
+import numpy as np
+import torch
+
+from douzero.evaluation.deep_agent import DeepAgent
+from douzero.env.env import get_obs
+from douzero.env.game import GameEnv
+from douzero.env.game import InfoSet
+from douzero.env.game import bombs
+from douzero.evaluation.deep_agent import DeepAgent
+from douzero.evaluation import simulation as sim
+
+dirname = os.path.dirname(os.path.abspath(__file__))
 
 Name2Real = {
     '1D': 'D', '1X': 'X',
@@ -28,3 +42,13 @@ Env2Real = {
     'A', 13: 'K', 12: 'Q', 11: 'J',
     10: 'T', 9: '9', 8: '8', 7: '7',
     6: '6', 5: '5', 4: '4', 3: '3'}
+
+
+models = {
+    'landlord': os.path.join(dirname, "baselines/douzero_WP/landlord.ckpt"),
+    'landlord_up': os.path.join(dirname, "baselines/douzero_WP/landlord_up.ckpt"),
+    'landlord_down': os.path.join(dirname, "baselines/douzero_WP/landlord_down.ckpt")
+}
+
+
+
