@@ -4,11 +4,11 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "run game.py",
+            "label": "Run Python File",
             "type": "process",
             "command": "${config:python.defaultInterpreterPath}",
             "args": [
-                "${workspaceFolder}/src/game.py"
+                "${workspaceFolder}/src/monitor.py"
             ],
             "problemMatcher": [],
             "group": {

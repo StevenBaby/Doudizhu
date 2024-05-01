@@ -291,62 +291,82 @@ class Doudizhu(object):
         return self.marks[self.index]
 
 
-class DoudizhuOne(Doudizhu):
+class DoudizhuOneEnv(DoudizhuEnv):
+
+    def __init__(self, players, name):
+        super().__init__(players)
+        self.name = name
+        logger.info('doudizhu one name %s', name)
+
+    def update_acting_player_hand_cards(self, action):
+        if not action:
+            return
+        if self.name != self.acting_player_position:
+            cards = self.info_sets[self.acting_player_position].player_hand_cards
+            cards = cards[:-len(action)] + action
+            self.info_sets[self.acting_player_position].player_hand_cards = cards
+        return super().update_acting_player_hand_cards(action)
+
+
+class DoudizhuOne(object):
+
+    OWN_NAME = {
+        0: 'landlord',
+        1: 'landlord_up',
+        2: 'landlord_down',
+    }
 
     def __init__(self, players, landlord, own, three) -> None:
         logger.info('landlord %s', landlord)
         self.landlord = landlord
         self.index = landlord
 
-        data = list(Name2Real.keys())
+        data = AllEnvCards.copy()
+
+        for var in own:
+            data.remove(var)
+
+        if len(own) == 17:
+            for var in three:
+                data.remove(var)
 
         logger.info("three env %s", three)
-        three_cards = []
-        for var in data:
-            if Real2Env[Name2Real[var]] in three:
-                three_cards.append(var)
-                three.remove(Real2Env[Name2Real[var]])
-
-        for var in three_cards:
-            data.remove(var)
-
-        logger.info('three cards %s', three_cards)
-
         logger.info("own cards env %s", own)
-        own_cards = []
-        for var in data:
-            if Real2Env[Name2Real[var]] in own:
-                own_cards.append(var)
-                own.remove(Real2Env[Name2Real[var]])
-
-        for var in own_cards:
-            data.remove(var)
-
-        logger.info('own cards %s', own_cards)
-        logger.info('other cards %s', data)
+        logger.info('other cards %s %s', len(data), data)
 
         self.cards = [
-            own_cards,
-            data[0:17],
+            own,
+            data[:17],
             data[17:],
-            three_cards,
+            three,
         ]
 
-        self.cards[self.landlord] += self.three_cards
-
-        self.marks = [
-            {},
-            {},
-            {},
-        ]
+        if len(own) == 17:
+            self.cards[self.landlord] += three
 
         card_play_data = {
-            'landlord': [Real2Env[Name2Real[name]] for name in self.cards[self.landlord]],
-            'landlord_down': [Real2Env[Name2Real[name]] for name in self.cards[self.landlord - 2]],
-            'landlord_up': [Real2Env[Name2Real[name]] for name in self.cards[self.landlord - 1]],
-            'three_landlord_cards': [Real2Env[Name2Real[name]] for name in self.three_cards],
+            'landlord': self.cards[self.landlord],
+            'landlord_down': self.cards[(self.landlord - 2) % 3],
+            'landlord_up': self.cards[(self.landlord - 1) % 3],
+            'three_landlord_cards': three,
         }
 
         self.players = players
-        self.env = DoudizhuEnv(players)
+        self.env = DoudizhuOneEnv(players, self.OWN_NAME[self.landlord])
         self.env.card_play_init(card_play_data)
+
+    def hint(self):
+        if self.index != 0:
+            return None, 0
+        ownname = self.OWN_NAME[self.landlord]
+        # logger.debug("current hint name %s", ownname)
+        infoset = self.env.info_sets[ownname]
+        action, confidence = self.players[ownname].act(copy.deepcopy(infoset))
+        return action, confidence
+
+    def next(self):
+        self.index = (self.index + 1) % 3
+
+    def action(self, action):
+        self.env.step(action)
+        self.next()

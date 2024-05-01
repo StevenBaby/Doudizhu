@@ -77,7 +77,7 @@ AREA_SHOW = Area(x=10, y=620, w=1800, h=220)
 AREA_UP = Area(x=200, y=200, w=700, h=280)
 AREA_DOWN = Area(x=900, y=200, w=700, h=280)
 AREA_OWN = Area(x=550, y=350, w=700, h=300)
-AREA_THREE = Area(x=800, y=0, w=220, h=150)
+AREA_THREE = Area(x=800, y=0, w=350, h=150)
 
 
 def find_cards(image: np.ndarray, area: Area, patterns: dict[str, np.ndarray], confidence=0.97):
@@ -291,6 +291,48 @@ def convertColor2Env(data: dict[str, int]):
 
     cards = [Real2Env[Color2Real[var]] for var in names]
     return cards
+
+
+def find_start_frame(image: np.ndarray):
+    landlord = find_landlord(image)
+    if landlord is None:
+        return None
+    show = find_show_color_cards(image)
+    show_env = convertColor2Env(show)
+
+    three = find_three_color_cards(image)
+    three_env = convertColor2Env(three)
+    if len(three_env) != 3:
+        return None
+
+    own_count = sum(show.values())
+    down_count = find_down_counts(image)
+    up_count = find_up_counts(image)
+    count = sum([own_count, down_count, up_count])
+    if count != 54:
+        return None
+    return landlord, three_env, show_env, own_count, down_count, up_count
+
+
+def find_own_action(image: np.ndarray):
+    own = find_own_color_cards(image)
+    own_env = convertColor2Env(own)
+    own_pass = find_own_pass(image)
+    return own_env, own_pass
+
+
+def find_down_action(image: np.ndarray):
+    down = find_down_color_cards(image)
+    down_env = convertColor2Env(down)
+    down_pass = find_down_pass(image)
+    return down_env, down_pass,
+
+
+def find_up_action(image: np.ndarray):
+    up = find_up_color_cards(image)
+    up_env = convertColor2Env(up)
+    up_pass = find_up_pass(image)
+    return up_env, up_pass
 
 
 class InfoFrame(object):
