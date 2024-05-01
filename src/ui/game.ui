@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>930</width>
+    <width>953</width>
     <height>852</height>
    </rect>
   </property>
@@ -290,7 +290,7 @@
       </property>
       <property name="maximumSize">
        <size>
-        <width>300</width>
+        <width>480</width>
         <height>16777215</height>
        </size>
       </property>
@@ -450,6 +450,45 @@
       <layout class="QHBoxLayout" name="own_show_layout"/>
      </widget>
     </item>
+    <item row="4" column="2" rowspan="2">
+     <widget class="QFrame" name="image_frame">
+      <property name="minimumSize">
+       <size>
+        <width>300</width>
+        <height>100</height>
+       </size>
+      </property>
+      <property name="font">
+       <font>
+        <family>DengXian</family>
+        <pointsize>16</pointsize>
+       </font>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Sunken</enum>
+      </property>
+      <layout class="QHBoxLayout" name="image_layout">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+      </layout>
+     </widget>
+    </item>
     <item row="5" column="0">
      <widget class="QFrame" name="own_frame">
       <property name="minimumSize">
@@ -496,7 +535,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>930</width>
+     <width>953</width>
      <height>22</height>
     </rect>
    </property>

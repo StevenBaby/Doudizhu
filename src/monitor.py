@@ -44,8 +44,11 @@ class MonitorWidget(QtWidgets.QWidget):
         img = frame.image
         h, w, c = img.shape
 
-        h //= 2
-        w //= 2
+        # h //= 2
+        # w //= 2
+        h = 240
+        w = int(h * 1.777)
+        self.setMaximumSize(w, h)
 
         img = cv2.resize(img, (w, h)).copy()
         bytes_per_line = c * w

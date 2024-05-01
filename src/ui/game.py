@@ -23,7 +23,7 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(930, 852)
+        MainWindow.resize(953, 852)
         font = QFont()
         font.setFamilies([u"DengXian"])
         font.setPointSize(20)
@@ -133,7 +133,7 @@ class Ui_MainWindow(object):
         self.frame_2 = QFrame(self.centralwidget)
         self.frame_2.setObjectName(u"frame_2")
         self.frame_2.setMinimumSize(QSize(300, 300))
-        self.frame_2.setMaximumSize(QSize(300, 16777215))
+        self.frame_2.setMaximumSize(QSize(480, 16777215))
         self.frame_2.setFrameShape(QFrame.StyledPanel)
         self.frame_2.setFrameShadow(QFrame.Sunken)
         self.verticalLayout = QVBoxLayout(self.frame_2)
@@ -197,6 +197,19 @@ class Ui_MainWindow(object):
 
         self.gridLayout.addWidget(self.own_show_frame, 4, 1, 2, 1)
 
+        self.image_frame = QFrame(self.centralwidget)
+        self.image_frame.setObjectName(u"image_frame")
+        self.image_frame.setMinimumSize(QSize(300, 100))
+        self.image_frame.setFont(font1)
+        self.image_frame.setFrameShape(QFrame.StyledPanel)
+        self.image_frame.setFrameShadow(QFrame.Sunken)
+        self.image_layout = QHBoxLayout(self.image_frame)
+        self.image_layout.setSpacing(0)
+        self.image_layout.setObjectName(u"image_layout")
+        self.image_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.gridLayout.addWidget(self.image_frame, 4, 2, 2, 1)
+
         self.own_frame = QFrame(self.centralwidget)
         self.own_frame.setObjectName(u"own_frame")
         self.own_frame.setMinimumSize(QSize(300, 100))
@@ -213,7 +226,7 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 930, 22))
+        self.menubar.setGeometry(QRect(0, 0, 953, 22))
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QStatusBar(MainWindow)
         self.statusbar.setObjectName(u"statusbar")

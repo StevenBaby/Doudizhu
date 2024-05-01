@@ -1,5 +1,6 @@
 import os
 import random
+import copy
 
 import numpy as np
 import torch
@@ -10,6 +11,8 @@ from douzero.env.game import GameEnv
 from douzero.env.game import InfoSet
 from douzero.env.game import bombs
 from douzero.evaluation import simulation as sim
+
+from logger import logger
 
 dirname = os.path.dirname(os.path.abspath(__file__))
 
@@ -52,33 +55,113 @@ Suit = {
     'D': 1,
 }
 
+AllEnvCards = [
+    Real2Env[Name2Real[name]] for name in Name2Real
+]
+
+
+LANDLORD = 'landlord'
+LANDLORD_UP = 'landlord_up'
+LANDLORD_DOWN = 'landlord_down'
 
 models = {
     'landlord': os.path.join(dirname, "baselines/douzero_WP/landlord.ckpt"),
+    'landlord_down': os.path.join(dirname, "baselines/douzero_WP/landlord_down.ckpt"),
     'landlord_up': os.path.join(dirname, "baselines/douzero_WP/landlord_up.ckpt"),
-    'landlord_down': os.path.join(dirname, "baselines/douzero_WP/landlord_down.ckpt")
 }
+
+NAME_ZH = ['地主', '下家', "上家"]
+
+
+class DoudizhuAgent(DeepAgent):
+
+    def predict(self, infoset):
+        # if len(infoset.legal_actions) == 1:
+        #     return infoset.legal_actions[0]
+
+        obs = get_obs(infoset)
+
+        z_batch = torch.from_numpy(obs['z_batch']).float()
+        x_batch = torch.from_numpy(obs['x_batch']).float()
+        if torch.cuda.is_available():
+            z_batch, x_batch = z_batch.cuda(), x_batch.cuda()
+        y_pred = self.model.forward(z_batch, x_batch, return_value=True)['values']
+        y_pred = y_pred.detach().cpu().numpy()
+        return y_pred
+
+    def act(self, infoset):
+        y_pred = self.predict(infoset)
+
+        best_action_index = np.argmax(y_pred, axis=0)[0]
+        best_action = infoset.legal_actions[best_action_index]
+        best_confidence = y_pred[best_action_index][0]
+        best_confidence = max(best_confidence, -1.0)
+        best_confidence = min(best_confidence, 1.0)
+
+        return best_action, best_confidence
+
+
+def init_agent():
+    logger.info("init agent model...")
+    players = {name: DoudizhuAgent(name, modelpath) for name, modelpath in models.items()}
+    logger.info("init agent model finish...")
+    return players
+
+
+class DoudizhuEnv(GameEnv):
+
+    def step(self, action=None):
+        if action is None:
+            action, confidence = self.players[self.acting_player_position].act(
+                self.game_infoset)
+
+        if len(action) > 0:
+            self.last_pid = self.acting_player_position
+
+        if action in bombs:
+            self.bomb_num += 1
+
+        self.last_move_dict[
+            self.acting_player_position] = action.copy()
+
+        self.card_play_action_seq.append(action)
+        self.update_acting_player_hand_cards(action)
+
+        self.played_cards[self.acting_player_position] += action
+
+        if self.acting_player_position == 'landlord' and \
+                len(action) > 0 and \
+                len(self.three_landlord_cards) > 0:
+            for card in action:
+                if len(self.three_landlord_cards) > 0:
+                    if card in self.three_landlord_cards:
+                        self.three_landlord_cards.remove(card)
+                else:
+                    break
+
+        self.game_done()
+        if not self.game_over:
+            self.get_acting_player_position()
+            self.game_infoset = self.get_infoset()
 
 
 class Doudizhu(object):
 
-    def __init__(self) -> None:
+    def __init__(self, players) -> None:
         data = list(Name2Real.keys())
         random.shuffle(data)
+        self.index = random.randint(0, 2)
+        # self.index = 0
+        self.landlord = self.index
 
-        self.own_cards = data[:17]
-        self.down_cards = data[17:34]
-        self.up_cards = data[34:-3]
-        self.three_cards = data[-3:]
-
-        self.own_cards += self.three_cards
-        self.index = 0
         self.cards = [
-
-            self.own_cards,
-            self.down_cards,
-            self.up_cards,
+            data[:17],
+            data[17:34],
+            data[34:-3],
+            data[-3:]
         ]
+
+        self.cards[self.landlord] += self.three_cards
 
         self.marks = [
             {},
@@ -86,15 +169,67 @@ class Doudizhu(object):
             {},
         ]
 
+        card_play_data = {
+            'landlord': [Real2Env[Name2Real[name]] for name in self.cards[self.landlord]],
+            'landlord_down': [Real2Env[Name2Real[name]] for name in self.cards[self.landlord - 2]],
+            'landlord_up': [Real2Env[Name2Real[name]] for name in self.cards[self.landlord - 1]],
+            'three_landlord_cards': [Real2Env[Name2Real[name]] for name in self.three_cards],
+        }
+
+        self.players = players
+        self.env = DoudizhuEnv(players)
+        self.env.card_play_init(card_play_data)
+
+    def hint(self):
+        infoset = self.env.info_sets[self.current_name]
+        action, confidence = self.players[self.current_name].act(copy.deepcopy(infoset))
+        logger.info("get action %s confidence %s", action, confidence)
+        result = []
+
+        for name in self.current_cards:
+            env = Real2Env[Name2Real[name]]
+            if env in action:
+                result.append(name)
+                action.remove(env)
+        return result, confidence
+
+    def check_action(self, action):
+        action = sorted(action)
+        for a in self.env.info_sets[self.current_name].legal_actions:
+            if tuple(a) == tuple(action):
+                return True
+        return False
+
     def action(self, cards: list[str]):
+        act = [Real2Env[Name2Real[name]] for name in cards]
+        if not self.check_action(act):
+            return False
+
         for name in cards:
             self.cards[self.index].remove(name)
             self.marks[self.index].setdefault(Name2Real[name], 0)
             self.marks[self.index][Name2Real[name]] += 1
 
+        self.env.step(act)
+
     def next(self):
         self.index = (self.index + 1) % 3
 
+    def index_zh_name(self, idx):
+        return NAME_ZH[(idx - self.landlord) % 3]
+
+    def index_name(self, idx):
+        return list(models.keys())[(idx - self.landlord) % 3]
+
+    @property
+    def current_zh_name(self):
+        return self.index_zh_name(self.index)
+
+    @property
+    def current_name(self):
+        return self.index_name(self.index)
+
+    @property
     def remain_cards(self):
         cards = {}
         for name in list(Name2Real.keys()):
@@ -107,3 +242,15 @@ class Doudizhu(object):
                 cards[name] -= cnt
 
         return cards
+
+    @property
+    def three_cards(self):
+        return self.cards[3]
+
+    @property
+    def current_cards(self):
+        return self.cards[self.index]
+
+    @property
+    def current_mark(self):
+        return self.marks[self.index]

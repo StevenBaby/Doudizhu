@@ -27,7 +27,7 @@ def find_available_area(image: np.ndarray, area: Area = None):
 
     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
-        return None
+        return None, None
 
     cnt = contours[0]
 

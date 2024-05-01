@@ -8,11 +8,14 @@ from PySide6 import QtGui, QtCore, QtWidgets
 
 import card
 import ui
+import monitor
 from logger import logger
 from doudizhu import *
 
 
 class GameWindow(QtWidgets.QMainWindow):
+
+    FONT_STYLE = '''font:14pt DengXian;'''
 
     def __init__(self) -> None:
         super().__init__()
@@ -34,7 +37,7 @@ class GameWindow(QtWidgets.QMainWindow):
             self.ui.three_layout,
         ]
         self.lists = [card.CardList(self) for _ in range(4)]
-        self.lists[3].label.setVisible(False)
+        self.lists[3].card_count.setVisible(False)
 
         for i in range(4):
             cardlist = self.lists[i]
@@ -46,10 +49,11 @@ class GameWindow(QtWidgets.QMainWindow):
             self.ui.down_show_layout,
             self.ui.up_show_layout,
         ]
+
         self.show_lists = [card.CardList(self) for _ in range(3)]
         for i in range(3):
             cardlist = self.show_lists[i]
-            cardlist.label.setVisible(False)
+            cardlist.card_count.setVisible(False)
             cardlist.setSelectable(False)
             self.show_layouts[i].addWidget(cardlist)
 
@@ -70,19 +74,19 @@ class GameWindow(QtWidgets.QMainWindow):
             self.ui.up_frame,
         ]
 
-        # logger.info("loading models....")
+        self.monitor = monitor.MonitorWidget(self)
+        self.ui.image_layout.addWidget(self.monitor)
+        self.monitor.start()
 
-        # self.players = {}
-        # for name in player_names:
-        #     self.players[name] = doudizhu.DouDizhuAgent(name, models[name])
+        self.players = init_agent()
 
-        # self.timer = QtCore.QTimer(self)
-        # # 连接 timeout 信号到自定义的槽函数
-        # self.timer.timeout.connect(self.show_step)
+        self.timer = QtCore.QTimer(self)
+        # 连接 timeout 信号到自定义的槽函数
+        self.timer.timeout.connect(self.show_step)
 
-        # # 设置定时器间隔（以毫秒为单位）
-        # self.sleep_duration = 1000  # 1 秒
-        # self.timer.setSingleShot(True)  # 设置为单次触发定时器
+        # 设置定时器间隔（以毫秒为单位）
+        self.sleep_duration = 3000  # 1 秒
+        self.timer.setSingleShot(True)  # 设置为单次触发定时器
 
         self.start_game()
 
@@ -109,32 +113,42 @@ class GameWindow(QtWidgets.QMainWindow):
     def switch_list(self):
         for i in range(3):
             if i == self.game.index:
-                self.frames[i].setStyleSheet("background-color:#009999;")
+                name = self.frames[i].objectName()
+                style = f'QFrame {{{self.FONT_STYLE}}} QFrame#{name}{{ border: 2px solid #00ff99;}}'
+                self.frames[i].setStyleSheet(style)
                 # self.frames[i].setEnabled(True)
                 self.lists[i].setSelectable(True)
             else:
-                self.frames[i].setStyleSheet("background-color: transparent;")
+                # name = self.frames[i].objectName()
+                self.frames[i].setStyleSheet(self.FONT_STYLE)
                 # self.frames[i].setEnabled(False)
                 self.lists[i].setSelectable(False)
 
     def start_game(self):
         logger.debug("start game")
-        self.game = Doudizhu()
+        self.game = Doudizhu(self.players)
+
+        self.ui.statusbar.showMessage("")
 
         for i in range(3):
-            self.lists[i].cards = self.game.cards[i]
-            self.lists[i].update()
+            self.lists[i].update(self.game.cards[i])
+            self.lists[i].name.setText(self.game.index_zh_name(i))
             self.show_lists[i].clear()
-            self.mark_lists[i].cards = self.game.marks[i]
-            self.mark_lists[i].updateCard()
+            self.mark_lists[i].updateCard(self.game.marks[i])
 
-        self.three_list.cards = self.game.three_cards
-        self.three_list.update(True)
+        for i in (1, 2):
+            self.lists[i].setBack(True)
 
-        self.all_mark.cards = self.game.remain_cards()
-        self.all_mark.updateCard()
+        self.three_list.update(self.game.three_cards)
+        self.all_mark.updateCard(self.game.remain_cards)
         self.switch_list()
-        # self.up_list.setBack(True)
+
+        if self.game.index != 0:
+            self.show_step()
+
+    def show_step(self):
+        self.hint()
+        self.show_cards()
 
     def show_cards(self):
         cards = self.current_list.getSelectedCards()
@@ -145,19 +159,40 @@ class GameWindow(QtWidgets.QMainWindow):
         self.current_show.update()
 
         self.current_list.clear()
-        self.current_list.cards = self.game.cards[self.game.index]
+        self.current_list.cards = self.game.current_cards
         self.current_list.update()
 
-        self.current_mark.cards = self.game.marks[self.game.index]
+        self.current_mark.cards = self.game.current_mark
         self.current_mark.updateCard()
 
-        self.all_mark.cards = self.game.remain_cards()
+        self.all_mark.cards = self.game.remain_cards
         self.all_mark.updateCard()
+
         self.game.next()
         self.switch_list()
 
+        if self.game.env.game_over:
+            if self.game.env.num_wins['landlord'] > 0:
+                message = '地主胜利'
+            elif self.game.env.num_wins['farmer'] > 0:
+                message = '农民胜利'
+            for i in (1, 2):
+                self.lists[i].setBack(False)
+            self.ui.statusbar.showMessage(f"{message}，游戏结束！！！")
+            return
+
+        if self.game.index in (1, 2):
+            self.timer.start(self.sleep_duration)
+
     def hint(self):
-        ...
+        action, confidence = self.game.hint()
+        if not action:
+            string = '不出'
+        else:
+            string = ' '.join(sorted([Name2Real[var] for var in action]))
+
+        self.current_list.setSelected(action)
+        self.ui.statusbar.showMessage(f"{self.game.current_zh_name}出牌：{string}; 胜率：{confidence:0.3f}")
 
 
 def main():

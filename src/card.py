@@ -112,10 +112,16 @@ class CardList(QtWidgets.QWidget):
 
         self.setMaximumHeight(self.CARD_HEIGHT + self.TOP_OFFSET)
 
-        self.label = QtWidgets.QLabel(self)
-        self.label.setText('0')
+        self.card_count = QtWidgets.QLabel(self)
+        self.card_count.setText('0')
 
-    def update(self, sort=True):
+        self.name = QtWidgets.QLabel(self)
+        self.name.move(30, 0)
+        self.name.setText('')
+
+    def update(self, cards=None, sort=True):
+        if cards:
+            self.cards = cards
         if sort:
             self.cards = sorted(
                 self.cards,
@@ -128,16 +134,20 @@ class CardList(QtWidgets.QWidget):
         for idx, name in enumerate(self.cards):
             card = self.all_cards[name]
             rect = card.geometry()
+            if card.selected:
+                y = self.SELECT_OFFSET
+            else:
+                y = self.TOP_OFFSET
             card.setGeometry(
                 self.LIST_OFFSET * idx,
-                self.TOP_OFFSET,
+                y,
                 rect.width(),
                 rect.height())
             card.setVisible(True)
             card.raise_()
 
-        self.label.setText(str(len(self.cards)))
-        self.label.raise_()
+        self.card_count.setText(str(len(self.cards)))
+        self.card_count.raise_()
 
         super().update()
 
@@ -157,6 +167,16 @@ class CardList(QtWidgets.QWidget):
         if not select:
             for card in self.all_cards.values():
                 card.selected = False
+        self.update()
+
+    def setSelected(self, cards: list[str]):
+        for name in self.cards:
+            card = self.all_cards[name]
+            card.selected = False
+            if name in cards:
+                card.selected = True
+                cards.remove(name)
+        assert (len(cards) == 0)
         self.update()
 
     def selectCard(self, card: Card):
@@ -245,7 +265,9 @@ class CardMarker(QtWidgets.QTableWidget):
             item.setTextAlignment(QtCore.Qt.AlignCenter)
             self.setItem(1, idx, item)
 
-    def updateCard(self):
+    def updateCard(self, cards=None):
+        if cards:
+            self.cards = cards
         for idx, name in enumerate(self.CARD_TYPES.values()):
             if name in self.cards:
                 text = str(self.cards[name])
