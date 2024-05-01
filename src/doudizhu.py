@@ -59,6 +59,31 @@ AllEnvCards = [
     Real2Env[Name2Real[name]] for name in Name2Real
 ]
 
+Name2Color = {
+    '1D': '1R', '1X': '1B',
+    '2S': '2B', '2H': '2R', '2C': '2B', '2D': '2R',
+    'AS': 'AB', 'AH': 'AR', 'AC': 'AB', 'AD': 'AR',
+    'KS': 'KB', 'KH': 'KR', 'KC': 'KB', 'KD': 'KR',
+    'QS': 'QB', 'QH': 'QR', 'QC': 'QB', 'QD': 'QR',
+    'JS': 'JB', 'JH': 'JR', 'JC': 'JB', 'JD': 'JR',
+    'TS': 'TB', 'TH': 'TR', 'TC': 'TB', 'TD': 'TR',
+    '9S': '9B', '9H': '9R', '9C': '9B', '9D': '9R',
+    '8S': '8B', '8H': '8R', '8C': '8B', '8D': '8R',
+    '7S': '7B', '7H': '7R', '7C': '7B', '7D': '7R',
+    '6S': '6B', '6H': '6R', '6C': '6B', '6D': '6R',
+    '5S': '5B', '5H': '5R', '5C': '5B', '5D': '5R',
+    '4S': '4B', '4H': '4R', '4C': '4B', '4D': '4R',
+    '3S': '3B', '3H': '3R', '3C': '3B', '3D': '3R'
+}
+
+Color2Real = {
+    '1R': 'D', '1B': 'X', '2B': '2', '2R': '2',
+    'AB': 'A', 'AR': 'A', 'KB': 'K', 'KR': 'K', 'QB': 'Q', 'QR': 'Q',
+    'JB': 'J', 'JR': 'J', 'TB': 'T', 'TR': 'T', '9B': '9', '9R': '9',
+    '8B': '8', '8R': '8', '7B': '7', '7R': '7', '6B': '6', '6R': '6',
+    '5B': '5', '5R': '5', '4B': '4', '4R': '4', '3B': '3', '3R': '3'
+}
+
 
 LANDLORD = 'landlord'
 LANDLORD_UP = 'landlord_up'
