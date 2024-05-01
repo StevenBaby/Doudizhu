@@ -114,13 +114,15 @@ class CardList(QtWidgets.QWidget):
 
         self.card_count = QtWidgets.QLabel(self)
         self.card_count.setText('0')
+        self.card_count.resize(30, 30)
 
         self.name = QtWidgets.QLabel(self)
         self.name.move(30, 0)
+        self.name.resize(300, 30)
         self.name.setText('')
 
     def update(self, cards=None, sort=True):
-        if cards:
+        if cards is not None:
             self.cards = cards
         if sort:
             self.cards = sorted(

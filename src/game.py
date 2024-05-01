@@ -11,6 +11,7 @@ import ui
 import monitor
 from logger import logger
 from doudizhu import *
+from qq import InfoFrame
 
 
 class GameWindow(QtWidgets.QMainWindow):
@@ -77,6 +78,8 @@ class GameWindow(QtWidgets.QMainWindow):
         self.monitor = monitor.MonitorWidget(self)
         self.ui.image_layout.addWidget(self.monitor)
         self.monitor.start()
+        self.monitor.start_signal.connect(self.start_frame)
+        self.monitor.update_signal.connect(self.update_frame)
 
         self.players = init_agent()
 
@@ -88,7 +91,8 @@ class GameWindow(QtWidgets.QMainWindow):
         self.sleep_duration = 3000  # 1 秒
         self.timer.setSingleShot(True)  # 设置为单次触发定时器
 
-        self.start_game()
+        self.game = None
+        # self.start_game()
 
     @property
     def current_list(self):
@@ -124,8 +128,40 @@ class GameWindow(QtWidgets.QMainWindow):
                 # self.frames[i].setEnabled(False)
                 self.lists[i].setSelectable(False)
 
+    def start_frame(self, frame: InfoFrame):
+        logger.info("start frame ...")
+        self.game = DoudizhuOne(
+            self.players,
+            frame.landlord,
+            frame.show_env,
+            frame.three_env,
+        )
+
+        self.ui.statusbar.showMessage("")
+
+        for i in range(3):
+            self.lists[i].update(self.game.cards[i])
+            self.lists[i].name.setText(self.game.index_zh_name(i))
+            self.show_lists[i].clear()
+            self.mark_lists[i].updateCard(self.game.marks[i])
+
+        for i in (1, 2):
+            self.lists[i].setBack(True)
+
+        self.three_list.update(self.game.three_cards)
+        self.all_mark.updateCard(self.game.remain_cards)
+        self.switch_list()
+
+    def update_frame(self, frame: tuple[int, list, InfoFrame]):
+        index, action, info = frame
+        logger.info("update frame %s, %s", index, action)
+
+        self.show_lists[index].update(convertEnv2Name(action))
+        self.lists[0].update(convertEnv2Name(info.show_env))
+
     def start_game(self):
         logger.debug("start game")
+
         self.game = Doudizhu(self.players)
 
         self.ui.statusbar.showMessage("")

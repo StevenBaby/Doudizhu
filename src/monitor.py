@@ -18,6 +18,8 @@ from logger import logger
 class MonitorWidget(QtWidgets.QWidget):
 
     frame_signal = QtCore.Signal(object)
+    start_signal = QtCore.Signal(object)
+    update_signal = QtCore.Signal(object)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
@@ -30,6 +32,8 @@ class MonitorWidget(QtWidgets.QWidget):
         self.frame_thread = None
 
         self.frame_signal.connect(self.update_frame)
+        self.index = 0
+        self.last_action = None
 
     def capture_frame(self):
         logger.debug("capture frame")
@@ -38,6 +42,26 @@ class MonitorWidget(QtWidgets.QWidget):
             return
 
         self.frame_signal.emit(frame)
+        if frame.count == 54 and frame.landlord is not None:
+            self.index = frame.landlord
+            self.start_signal.emit(frame)
+            return
+
+        lists = [
+            frame.own_env,
+            frame.down_env,
+            frame.up_env,
+        ]
+        passes = [
+            frame.own_pass,
+            frame.down_pass,
+            frame.up_pass,
+        ]
+
+        if lists[self.index] or passes[self.index]:
+            action = lists[self.index]
+            self.update_signal.emit((self.index, action, frame))
+            self.index = (self.index + 1) % 3
 
     def update_frame(self, frame: qq.InfoFrame):
         # logger.debug('update info')
@@ -56,6 +80,7 @@ class MonitorWidget(QtWidgets.QWidget):
             img.data, w, h,
             bytes_per_line, QtGui.QImage.Format.Format_RGB888,
         )
+
         pixmap = QtGui.QPixmap.fromImage(qimg)
         self.ui.image.setPixmap(pixmap)
 

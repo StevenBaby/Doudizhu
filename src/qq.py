@@ -213,8 +213,8 @@ LANDLORD_AREA = {
 
 OWN_INDEX = {
     'own': 0,
-    'down': 2,
-    'up': 1,
+    'down': 1,
+    'up': 2,
 }
 
 

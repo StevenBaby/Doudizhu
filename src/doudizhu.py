@@ -98,6 +98,16 @@ models = {
 NAME_ZH = ['地主', '下家', "上家"]
 
 
+def convertEnv2Name(cards):
+    data = list(Name2Real.keys())
+    result = []
+    for var in data:
+        if Real2Env[Name2Real[var]] in cards:
+            result.append(var)
+            cards.remove(Real2Env[Name2Real[var]])
+    return result
+
+
 class DoudizhuAgent(DeepAgent):
 
     def predict(self, infoset):
@@ -279,3 +289,64 @@ class Doudizhu(object):
     @property
     def current_mark(self):
         return self.marks[self.index]
+
+
+class DoudizhuOne(Doudizhu):
+
+    def __init__(self, players, landlord, own, three) -> None:
+        logger.info('landlord %s', landlord)
+        self.landlord = landlord
+        self.index = landlord
+
+        data = list(Name2Real.keys())
+
+        logger.info("three env %s", three)
+        three_cards = []
+        for var in data:
+            if Real2Env[Name2Real[var]] in three:
+                three_cards.append(var)
+                three.remove(Real2Env[Name2Real[var]])
+
+        for var in three_cards:
+            data.remove(var)
+
+        logger.info('three cards %s', three_cards)
+
+        logger.info("own cards env %s", own)
+        own_cards = []
+        for var in data:
+            if Real2Env[Name2Real[var]] in own:
+                own_cards.append(var)
+                own.remove(Real2Env[Name2Real[var]])
+
+        for var in own_cards:
+            data.remove(var)
+
+        logger.info('own cards %s', own_cards)
+        logger.info('other cards %s', data)
+
+        self.cards = [
+            own_cards,
+            data[0:17],
+            data[17:],
+            three_cards,
+        ]
+
+        self.cards[self.landlord] += self.three_cards
+
+        self.marks = [
+            {},
+            {},
+            {},
+        ]
+
+        card_play_data = {
+            'landlord': [Real2Env[Name2Real[name]] for name in self.cards[self.landlord]],
+            'landlord_down': [Real2Env[Name2Real[name]] for name in self.cards[self.landlord - 2]],
+            'landlord_up': [Real2Env[Name2Real[name]] for name in self.cards[self.landlord - 1]],
+            'three_landlord_cards': [Real2Env[Name2Real[name]] for name in self.three_cards],
+        }
+
+        self.players = players
+        self.env = DoudizhuEnv(players)
+        self.env.card_play_init(card_play_data)
