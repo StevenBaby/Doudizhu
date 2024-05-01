@@ -27,59 +27,47 @@ class GameWindow(QtWidgets.QMainWindow):
         self.ui.showButton.clicked.connect(self.show_cards)
         self.ui.hintButton.clicked.connect(self.hint)
 
-        self.own_list = card.CardList(self)
-        self.ui.own_layout.addWidget(self.own_list)
-
-        self.down_list = card.CardList(self)
-        self.ui.down_layout.addWidget(self.down_list)
-
-        self.up_list = card.CardList(self)
-        self.ui.up_layout.addWidget(self.up_list)
-
-        self.three_list = card.CardList(self)
-        self.ui.three_layout.addWidget(self.three_list)
-        self.three_list.label.setVisible(False)
-
-        self.lists = [
-            self.own_list,
-            self.down_list,
-            self.up_list,
+        self.layouts = [
+            self.ui.own_layout,
+            self.ui.down_layout,
+            self.ui.up_layout,
+            self.ui.three_layout,
         ]
+        self.lists = [card.CardList(self) for _ in range(4)]
+        self.lists[3].label.setVisible(False)
 
-        self.own_show_list = card.CardList(self)
-        self.own_show_list.label.setVisible(False)
-        self.ui.own_show_layout.addWidget(self.own_show_list)
+        for i in range(4):
+            cardlist = self.lists[i]
+            self.layouts[i].addWidget(cardlist)
+            self.lists.append(cardlist)
 
-        self.down_show_list = card.CardList(self)
-        self.down_show_list.label.setVisible(False)
-        self.ui.down_show_layout.addWidget(self.down_show_list)
-
-        self.up_show_list = card.CardList(self)
-        self.up_show_list.label.setVisible(False)
-        self.ui.up_show_layout.addWidget(self.up_show_list)
-
-        self.show_lists = [
-            self.own_show_list,
-            self.down_show_list,
-            self.up_show_list,
+        self.show_layouts = [
+            self.ui.own_show_layout,
+            self.ui.down_show_layout,
+            self.ui.up_show_layout,
         ]
+        self.show_lists = [card.CardList(self) for _ in range(3)]
+        for i in range(3):
+            cardlist = self.show_lists[i]
+            cardlist.label.setVisible(False)
+            cardlist.setSelectable(False)
+            self.show_layouts[i].addWidget(cardlist)
 
-        self.own_mark = card.CardMarker(self)
-        self.ui.own_mark_layout.addWidget(self.own_mark)
+        self.mark_layouts = [
+            self.ui.own_mark_layout,
+            self.ui.down_mark_layout,
+            self.ui.up_mark_layout,
+            self.ui.all_mark_layout,
+        ]
+        self.mark_lists = [card.CardMarker(self) for _ in range(4)]
+        for i in range(4):
+            marklist = self.mark_lists[i]
+            self.mark_layouts[i].addWidget(marklist)
 
-        self.down_mark = card.CardMarker(self)
-        self.ui.down_mark_layout.addWidget(self.down_mark)
-
-        self.up_mark = card.CardMarker(self)
-        self.ui.up_mark_layout.addWidget(self.up_mark)
-
-        self.all_mark = card.CardMarker(self)
-        self.ui.all_mark_layout.addWidget(self.all_mark)
-
-        self.mark_lists = [
-            self.own_mark,
-            self.down_mark,
-            self.up_mark
+        self.frames = [
+            self.ui.own_frame,
+            self.ui.down_frame,
+            self.ui.up_frame,
         ]
 
         # logger.info("loading models....")
@@ -98,45 +86,75 @@ class GameWindow(QtWidgets.QMainWindow):
 
         self.start_game()
 
+    @property
+    def current_list(self):
+        return self.lists[self.game.index]
+
+    @property
+    def current_mark(self):
+        return self.mark_lists[self.game.index]
+
+    @property
+    def current_show(self):
+        return self.show_lists[self.game.index]
+
+    @property
+    def three_list(self):
+        return self.lists[3]
+
+    @property
+    def all_mark(self):
+        return self.mark_lists[3]
+
+    def switch_list(self):
+        for i in range(3):
+            if i == self.game.index:
+                self.frames[i].setStyleSheet("background-color:#009999;")
+                # self.frames[i].setEnabled(True)
+                self.lists[i].setSelectable(True)
+            else:
+                self.frames[i].setStyleSheet("background-color: transparent;")
+                # self.frames[i].setEnabled(False)
+                self.lists[i].setSelectable(False)
+
     def start_game(self):
         logger.debug("start game")
         self.game = Doudizhu()
 
-        self.own_list.cards = self.game.own_cards
-        self.own_list.update(True)
-
-        self.down_list.cards = self.game.down_cards
-        self.down_list.update(True)
-
-        self.up_list.cards = self.game.up_cards
-        self.up_list.update(True)
+        for i in range(3):
+            self.lists[i].cards = self.game.cards[i]
+            self.lists[i].update()
+            self.show_lists[i].clear()
+            self.mark_lists[i].cards = self.game.marks[i]
+            self.mark_lists[i].updateCard()
 
         self.three_list.cards = self.game.three_cards
         self.three_list.update(True)
 
         self.all_mark.cards = self.game.remain_cards()
         self.all_mark.updateCard()
-
+        self.switch_list()
         # self.up_list.setBack(True)
 
     def show_cards(self):
-        l = self.lists[self.game.index]
-        cards = l.getSelectedCards()
+        cards = self.current_list.getSelectedCards()
 
         self.game.action(cards)
-        self.show_lists[self.game.index].cards = cards
-        self.show_lists[self.game.index].update(True)
 
-        l.clear()
-        l.cards = self.game.cards[self.game.index]
-        l.update(True)
+        self.current_show.cards = cards
+        self.current_show.update()
 
-        self.mark_lists[self.game.index].cards = self.game.marks[self.game.index]
-        self.mark_lists[self.game.index].updateCard()
+        self.current_list.clear()
+        self.current_list.cards = self.game.cards[self.game.index]
+        self.current_list.update()
+
+        self.current_mark.cards = self.game.marks[self.game.index]
+        self.current_mark.updateCard()
 
         self.all_mark.cards = self.game.remain_cards()
         self.all_mark.updateCard()
         self.game.next()
+        self.switch_list()
 
     def hint(self):
         ...

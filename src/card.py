@@ -85,7 +85,8 @@ class Card(QtWidgets.QLabel):
 
 class CardList(QtWidgets.QWidget):
 
-    SELECT_OFFSET = 20
+    SELECT_OFFSET = 30
+    TOP_OFFSET = 50
     LIST_OFFSET = 25
     CARD_WIDTH = 100
     CARD_HEIGHT = int(CARD_WIDTH * 336 / 216)
@@ -99,6 +100,7 @@ class CardList(QtWidgets.QWidget):
         self.back = False
         self.all_cards = {}
         self.cards = []
+        self.selectable = True
 
         for idx, name in enumerate(sorted(
                 Name2Real.keys(),
@@ -108,7 +110,7 @@ class CardList(QtWidgets.QWidget):
             card.setVisible(False)
             self.all_cards[name] = card
 
-        self.setMaximumHeight(self.CARD_HEIGHT + self.SELECT_OFFSET)
+        self.setMaximumHeight(self.CARD_HEIGHT + self.TOP_OFFSET)
 
         self.label = QtWidgets.QLabel(self)
         self.label.setText('0')
@@ -128,7 +130,7 @@ class CardList(QtWidgets.QWidget):
             rect = card.geometry()
             card.setGeometry(
                 self.LIST_OFFSET * idx,
-                self.SELECT_OFFSET,
+                self.TOP_OFFSET,
                 rect.width(),
                 rect.height())
             card.setVisible(True)
@@ -150,14 +152,24 @@ class CardList(QtWidgets.QWidget):
         for card in self.all_cards.values():
             card.setBack(back)
 
+    def setSelectable(self, select: bool):
+        self.selectable = select
+        if not select:
+            for card in self.all_cards.values():
+                card.selected = False
+        self.update()
+
     def selectCard(self, card: Card):
+        if not self.selectable:
+            return
+
         card.selected = not card.selected
         rect = card.geometry()
 
         if card.selected:
-            y = 0
-        else:
             y = self.SELECT_OFFSET
+        else:
+            y = self.TOP_OFFSET
 
         card.setGeometry(rect.x(), y, rect.width(), rect.height())
 
@@ -258,20 +270,20 @@ class TestWidget(QtWidgets.QWidget):
         super().__init__()
         self.setWindowTitle("测试窗口")
         self.horizontalLayout = QtWidgets.QHBoxLayout(self)
-        # self.cardlist = CardList(self)
-        self.cardmarker = CardMarker(self)
-        self.horizontalLayout.addWidget(self.cardmarker)
+        self.cardlist = CardList(self)
+        # self.cardmarker = CardMarker(self)
+        self.horizontalLayout.addWidget(self.cardlist)
 
-        # cards = list(Env2Real.keys())
-        # # print(cards)
-        # # random.shuffle(cards)
-        # self.cardlist.cards = cards
-        # self.cardlist.update()
+        cards = list(Name2Real.keys())
+        # print(cards)
+        # random.shuffle(cards)
+        self.cardlist.cards = cards
+        self.cardlist.update()
 
         self.setGeometry(3200, 100, 1000, 600)
 
-        self.cardmarker.cards['D'] = 1
-        self.cardmarker.updateCard()
+        # self.cardmarker.cards['D'] = 1
+        # self.cardmarker.updateCard()
 
     # def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
     #     # self.cardlist.clear()

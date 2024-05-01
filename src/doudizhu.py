@@ -9,7 +9,6 @@ from douzero.env.env import get_obs
 from douzero.env.game import GameEnv
 from douzero.env.game import InfoSet
 from douzero.env.game import bombs
-from douzero.evaluation.deep_agent import DeepAgent
 from douzero.evaluation import simulation as sim
 
 dirname = os.path.dirname(os.path.abspath(__file__))
@@ -74,8 +73,8 @@ class Doudizhu(object):
 
         self.own_cards += self.three_cards
         self.index = 0
-
         self.cards = [
+
             self.own_cards,
             self.down_cards,
             self.up_cards,
