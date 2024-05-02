@@ -26,6 +26,7 @@ class MonitorWidget(QtWidgets.QWidget):
     start_signal = QtCore.Signal(object)
     update_signal = QtCore.Signal(object)
     area_signal = QtCore.Signal(None)
+    restart_signal = QtCore.Signal(None)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None, delay=0.1, image_width=600) -> None:
         super().__init__(parent)
@@ -37,8 +38,10 @@ class MonitorWidget(QtWidgets.QWidget):
 
         self.area = None
         self.area_signal.connect(self.reset_area)
+        self.restart_signal.connect(self.restart_game)
 
-        keyboard.add_hotkey("ctrl + shift + alt + r", lambda: self.area_signal.emit())
+        keyboard.add_hotkey("ctrl + alt + j", lambda: self.area_signal.emit())
+        keyboard.add_hotkey("ctrl + alt + k", lambda: self.restart_signal.emit())
 
         self.running = False
         self.frame_thread = None
@@ -65,7 +68,35 @@ class MonitorWidget(QtWidgets.QWidget):
         return True
 
     def reset_area(self):
+        logger.info("reset capture area...")
         self.area = None
+
+    def restart_game(self):
+        logger.info("restart game ...")
+        self.started = False
+
+    def start_game(self, frame):
+        landlord, three, own, own_count, down_count, up_count = frame
+        self.index = landlord
+        logger.debug('started landlord %s', landlord)
+        logger.debug('started three %s', doudizhu.convertEnv2Real(three))
+        logger.debug('started card %s', doudizhu.convertEnv2Real(own))
+        self.started = True
+        self.remain_cards = collections.Counter(AllEnvCards)
+        self.counts = [own_count, down_count, up_count]
+        self.start_signal.emit((landlord, own, three))
+
+        # test only
+        self.game = doudizhu.DoudizhuOne(self.players, landlord, own, three)
+        self.print_hint()
+
+    def print_hint(self):
+        # test only
+        if not self.hinted:
+            action, confidence = self.game.hint()
+            if action is not None:
+                logger.info(f"hint {[Env2Real[var] for var in sorted(action)]} confidence {confidence:0.3f}")
+                self.hinted = True
 
     def capture_image(self):
         img = capture.capture("欢乐斗地主")
@@ -103,18 +134,7 @@ class MonitorWidget(QtWidgets.QWidget):
                 frame = frame0
             if not frame:
                 return
-
-            landlord, three, own, own_count, down_count, up_count = frame
-            self.index = landlord
-            logger.debug('started %s, %s, %s', landlord, own, three)
-            self.started = True
-            self.remain_cards = collections.Counter(AllEnvCards)
-            self.counts = [own_count, down_count, up_count]
-            self.start_signal.emit((landlord, own, three))
-
-            # test only
-            self.game = doudizhu.DoudizhuOne(self.players, landlord, own, three)
-            return
+            self.start_game(frame)
 
         find_functions = [
             qq.find_own_action,
@@ -122,12 +142,7 @@ class MonitorWidget(QtWidgets.QWidget):
             qq.find_up_action,
         ]
 
-        # test only
-        if not self.hinted:
-            action, confidence = self.game.hint()
-            if action is not None:
-                logger.info(f"hint {[Env2Real[var] for var in sorted(action)]} confidence {confidence:0.3f}")
-                self.hinted = True
+        self.print_hint()
 
         env, pas = None, None
         confirm = self.confirm
@@ -156,6 +171,7 @@ class MonitorWidget(QtWidgets.QWidget):
         if self.counts[self.index] == 0:
             self.started = False
             logger.info("game finished index %s win...", self.index)
+            return
 
         if env or pas:
             env = sorted(env)

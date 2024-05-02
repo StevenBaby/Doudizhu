@@ -98,6 +98,10 @@ models = {
 NAME_ZH = ['地主', '下家', "上家"]
 
 
+def convertEnv2Real(cards: list[int]):
+    return [Env2Real[var] for var in cards]
+
+
 def convertEnv2Name(cards):
     data = list(Name2Real.keys())
     result = []
