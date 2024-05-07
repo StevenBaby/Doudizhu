@@ -5,6 +5,7 @@ import collections
 import traceback
 import threading
 import time
+import logging
 
 import cv2
 import numpy as np
@@ -18,6 +19,20 @@ from doudizhu import AllEnvCards, Env2Real
 import doudizhu
 
 from logger import logger
+
+
+class QTextEditLogger(QtWidgets.QPlainTextEdit, logging.Handler):
+
+    FONT_STYLE = '''font:14pt DengXian;'''
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setReadOnly(True)
+        self.setStyleSheet(self.FONT_STYLE)
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.appendPlainText(msg)
 
 
 class MonitorWidget(QtWidgets.QWidget):
@@ -36,12 +51,18 @@ class MonitorWidget(QtWidgets.QWidget):
         self.ui.image.setScaledContents(True)
         self.delay = delay
 
+        # self.logbox = QTextEditLogger(self)
+
+        # self.ui.verticalLayout.addWidget(self.logbox)
+        # logging.getLogger().addHandler(self.logbox)
+
         self.area = None
         self.area_signal.connect(self.reset_area)
         self.restart_signal.connect(self.restart_game)
 
         keyboard.add_hotkey("ctrl + alt + j", lambda: self.area_signal.emit())
         keyboard.add_hotkey("ctrl + alt + k", lambda: self.restart_signal.emit())
+        keyboard.add_hotkey("ctrl + alt + h", lambda: self.print_hint(True))
 
         self.running = False
         self.frame_thread = None
@@ -88,11 +109,15 @@ class MonitorWidget(QtWidgets.QWidget):
 
         # test only
         self.game = doudizhu.DoudizhuOne(self.players, landlord, own, three)
-        self.print_hint()
+        self.print_hint(False)
 
-    def print_hint(self):
+    def print_hint(self, force):
         # test only
-        if not self.hinted:
+        if not self.game:
+            logger.info("game not initialized...")
+            return
+        if not self.hinted or force:
+            # logger.info('get hint from env...')
             action, confidence = self.game.hint()
             if action is not None:
                 logger.info(f"hint {[Env2Real[var] for var in sorted(action)]} confidence {confidence:0.3f}")
@@ -142,7 +167,7 @@ class MonitorWidget(QtWidgets.QWidget):
             qq.find_up_action,
         ]
 
-        self.print_hint()
+        self.print_hint(False)
 
         env, pas = None, None
         confirm = self.confirm
